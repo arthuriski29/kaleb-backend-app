@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  // UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { Model } from 'mongoose';
@@ -23,37 +29,57 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
-    const { name, username, password } = registerDto;
+    try {
+      const { name, username, password } = registerDto;
+      if (!name) throw new BadRequestException('Name is required');
+      if (!username) throw new BadRequestException('Username is required');
+      if (!password) throw new BadRequestException('Password is required');
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+      const checkSameUsername = await this.userModel.findOne({
+        username: username,
+      });
+      if (checkSameUsername)
+        throw new BadRequestException(
+          'This username has been registered, try another',
+        );
 
-    const user = await this.userModel.create({
-      name,
-      username,
-      password: hashedPassword,
-    });
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    const token = this.jwtService.sign({ id: user._id });
+      const user = await this.userModel.create({
+        name,
+        username,
+        password: hashedPassword,
+      });
 
-    return {
-      success: true,
-      message: 'User has been created successfully',
-      token: token,
-    };
+      const token = this.jwtService.sign({ id: user._id });
+
+      return {
+        success: true,
+        message: 'User has been created successfully',
+        token: token,
+      };
+    } catch (error) {
+      throw new InternalServerErrorException('Error, check your request');
+    }
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponse> {
     try {
       const { username, password } = loginDto;
       if (!username) {
-        throw new UnauthorizedException('Enter your Username');
+        throw new BadRequestException('Enter your Username');
       }
 
       const user = await this.userModel.findOne({ username });
+      if (!user) {
+        throw new BadRequestException(
+          'Username is not found, Make sure the username has been registered',
+        );
+      }
 
       const isPasswordMatched = await bcrypt.compare(password, user.password);
       if (!isPasswordMatched) {
-        throw new UnauthorizedException('Password is not match');
+        throw new BadRequestException('Password is not match');
       }
 
       const token = this.jwtService.sign({ id: user._id });
@@ -64,7 +90,22 @@ export class AuthService {
         token: token,
       };
     } catch (error) {
-      throw new UnauthorizedException('Unauthorized check your request');
+      console.log(error);
+    }
+  }
+
+  async getAccount(): Promise<any> {
+    try {
+      const data = await this.userModel.find();
+      if (!data) throw new NotFoundException('Data Not Found');
+
+      return {
+        success: true,
+        message: 'Get All User Account Success',
+        results: data,
+      };
+    } catch (error) {
+      throw new NotFoundException('Users Not Found');
     }
   }
 }

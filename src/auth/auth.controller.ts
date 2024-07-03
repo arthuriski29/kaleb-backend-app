@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Post,
   // UseGuards,
 } from '@nestjs/common';
@@ -20,6 +21,11 @@ import { AuthResponse } from '../interface/auth-response.interface';
 @Controller('')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('/getAccount/')
+  async getAccount(): Promise<any> {
+    return await this.authService.getAccount();
+  }
 
   @Post('/register')
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
